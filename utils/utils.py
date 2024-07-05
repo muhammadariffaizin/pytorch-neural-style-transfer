@@ -5,17 +5,12 @@ from torchvision import transforms
 import os
 import matplotlib.pyplot as plt
 
-
 from models.definitions.vgg_nets import Vgg16, Vgg19, Vgg16Experimental
-
 
 IMAGENET_MEAN_255 = [123.675, 116.28, 103.53]
 IMAGENET_STD_NEUTRAL = [1, 1, 1]
 
-
-#
 # Image manipulation util functions
-#
 
 def load_image(img_path, target_shape=None):
     if not os.path.exists(img_path):
@@ -36,12 +31,10 @@ def load_image(img_path, target_shape=None):
     img /= 255.0  # get to [0, 1] range
     return img
 
-
 def prepare_img(img_path, target_shape, device):
     img = load_image(img_path, target_shape=target_shape)
 
     # normalize using ImageNet's mean
-    # [0, 255] range worked much better for me than [0, 1] range (even though PyTorch models were trained on latter)
     transform = transforms.Compose([
         transforms.ToTensor(),
         transforms.Lambda(lambda x: x.mul(255)),
@@ -52,22 +45,18 @@ def prepare_img(img_path, target_shape, device):
 
     return img
 
-
 def save_image(img, img_path):
     if len(img.shape) == 2:
         img = np.stack((img,) * 3, axis=-1)
-    cv.imwrite(img_path, img[:, :, ::-1])  # [:, :, ::-1] converts rgb into bgr (opencv contraint...)
-
+    cv.imwrite(img_path, img[:, :, ::-1])  # [:, :, ::-1] converts rgb into bgr (opencv constraint...)
 
 def generate_out_img_name(config):
     prefix = os.path.basename(config['content_img_name']).split('.')[0] + '_' + os.path.basename(config['style_img_name']).split('.')[0]
-    # called from the reconstruction script
     if 'reconstruct_script' in config:
         suffix = f'_o_{config["optimizer"]}_h_{str(config["height"])}_m_{config["model"]}{config["img_format"][1]}'
     else:
         suffix = f'_o_{config["optimizer"]}_i_{config["init_method"]}_h_{str(config["height"])}_m_{config["model"]}_cw_{config["content_weight"]}_sw_{config["style_weight"]}_tv_{config["tv_weight"]}{config["img_format"][1]}'
     return prefix + suffix
-
 
 def save_and_maybe_display(optimizing_img, dump_path, config, img_id, num_of_iterations, should_display=False):
     saving_freq = config['saving_freq']
@@ -87,7 +76,6 @@ def save_and_maybe_display(optimizing_img, dump_path, config, img_id, num_of_ite
         plt.imshow(np.uint8(get_uint8_range(out_img)))
         plt.show()
 
-
 def get_uint8_range(x):
     if isinstance(x, np.ndarray):
         x -= np.min(x)
@@ -97,19 +85,12 @@ def get_uint8_range(x):
     else:
         raise ValueError(f'Expected numpy array got {type(x)}')
 
-
-#
 # End of image manipulation util functions
-#
 
-
-# initially it takes some time for PyTorch to download the models into local cache
 def prepare_model(model, device):
-    # we are not tuning model weights -> we are only tuning optimizing_img's pixels! (that's why requires_grad=False)
     experimental = False
     if model == 'vgg16':
         if experimental:
-            # much more flexible for experimenting with different style representations
             model = Vgg16Experimental(requires_grad=False, show_progress=True)
         else:
             model = Vgg16(requires_grad=False, show_progress=True)
@@ -124,8 +105,8 @@ def prepare_model(model, device):
 
     content_fms_index_name = (content_feature_maps_index, layer_names[content_feature_maps_index])
     style_fms_indices_names = (style_feature_maps_indices, layer_names)
+    
     return model.to(device).eval(), content_fms_index_name, style_fms_indices_names
-
 
 def gram_matrix(x, should_normalize=True):
     (b, ch, h, w) = x.size()
@@ -136,7 +117,6 @@ def gram_matrix(x, should_normalize=True):
         gram /= ch * h * w
     return gram
 
-
-def total_variation(y):
-    return torch.sum(torch.abs(y[:, :, :, :-1] - y[:, :, :, 1:])) + \
-           torch.sum(torch.abs(y[:, :, :-1, :] - y[:, :, 1:, :]))
+def ensure_exists(path):
+    if not os.path.exists(path):
+        os.makedirs(path)
