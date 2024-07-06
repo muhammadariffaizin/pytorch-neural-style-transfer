@@ -4,15 +4,16 @@ import torch
 from torchvision import transforms
 import os
 import matplotlib.pyplot as plt
+from scipy import ndimage
 
-from models.definitions.vgg_nets import Vgg16, Vgg19, Vgg16Experimental
+from models.definitions.vgg_nets import Vgg16, Vgg19, Vgg16Experimental, Vgg19Experimental
 
 IMAGENET_MEAN_255 = [123.675, 116.28, 103.53]
 IMAGENET_STD_NEUTRAL = [1, 1, 1]
 
 # Image manipulation util functions
 
-def load_image(img_path, target_shape=None):
+def load_image(img_path, target_shape=None, invert=False):
     if not os.path.exists(img_path):
         raise Exception(f'Path does not exist: {img_path}')
     img = cv.imread(img_path)[:, :, ::-1]  # [:, :, ::-1] converts BGR (opencv format...) into RGB
@@ -31,8 +32,8 @@ def load_image(img_path, target_shape=None):
     img /= 255.0  # get to [0, 1] range
     return img
 
-def prepare_img(img_path, target_shape, device):
-    img = load_image(img_path, target_shape=target_shape)
+def prepare_img(img_path, target_shape, device, invert=False):
+    img = load_image(img_path, target_shape=target_shape, invert=invert)
 
     # normalize using ImageNet's mean
     transform = transforms.Compose([
@@ -88,14 +89,17 @@ def get_uint8_range(x):
 # End of image manipulation util functions
 
 def prepare_model(model, device):
-    experimental = False
+    experimental = True
     if model == 'vgg16':
         if experimental:
             model = Vgg16Experimental(requires_grad=False, show_progress=True)
         else:
             model = Vgg16(requires_grad=False, show_progress=True)
     elif model == 'vgg19':
-        model = Vgg19(requires_grad=False, show_progress=True)
+        if experimental:
+            model = Vgg19Experimental(requires_grad=False, show_progress=True)
+        else:
+            model = Vgg19(requires_grad=False, show_progress=True)
     else:
         raise ValueError(f'{model} not supported.')
 
@@ -120,3 +124,31 @@ def gram_matrix(x, should_normalize=True):
 def ensure_exists(path):
     if not os.path.exists(path):
         os.makedirs(path)
+
+def rgb_to_grayscale(img):
+    if img.dim() != 3 or img.size(0) != 3:
+        raise ValueError(f'Expected img with shape (3, H, W), but got {img.shape}')
+    r, g, b = img[0, :, :], img[1, :, :], img[2, :, :]
+    gray = 0.2989 * r + 0.5870 * g + 0.1140 * b
+    return gray.unsqueeze(0)
+
+def dist_cv2(img, device):
+    img = img.squeeze(axis=0)
+    # convert dimension (3, 256, 256) to (256, 256, 3)
+    img = np.transpose(img.to('cpu').detach().numpy(), (1, 2, 0))
+    img = cv.cvtColor(img, cv.COLOR_RGB2GRAY)
+    img = cv.blur(img, (1, 1))
+    img = np.asarray(img, dtype=np.uint8)
+    img = cv.threshold(img, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU)[1]
+    img = np.asarray(img, dtype=np.uint8)
+    cv.imwrite('test-1.png', img)
+    img = ndimage.grey_erosion(img, size=(3, 3))
+
+    img_dist = cv.distanceTransform(img, cv.DIST_L2, 5)
+    cont_dist = torch.from_numpy(img_dist).float().to(device)
+
+    f = cont_dist.unsqueeze(0)
+    a = torch.cat([f, f, f], 0)
+    cv.imwrite('test-2.png', np.transpose(a.to('cpu').detach().numpy() * 255, (1, 2, 0)))
+    a = a.unsqueeze(0)
+    return a
