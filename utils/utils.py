@@ -88,7 +88,7 @@ def get_uint8_range(x):
 
 # End of image manipulation util functions
 
-def prepare_model(model, device):
+def prepare_model(model):
     experimental = True
     if model == 'vgg16':
         if experimental:
@@ -102,15 +102,8 @@ def prepare_model(model, device):
             model = Vgg19(requires_grad=False, show_progress=True)
     else:
         raise ValueError(f'{model} not supported.')
-
-    content_feature_maps_index = model.content_feature_maps_index
-    style_feature_maps_indices = model.style_feature_maps_indices
-    layer_names = model.layer_names
-
-    content_fms_index_name = (content_feature_maps_index, layer_names[content_feature_maps_index])
-    style_fms_indices_names = (style_feature_maps_indices, layer_names)
     
-    return model.to(device).eval(), content_fms_index_name, style_fms_indices_names
+    return model
 
 def gram_matrix(x, should_normalize=True):
     (b, ch, h, w) = x.size()
@@ -120,6 +113,11 @@ def gram_matrix(x, should_normalize=True):
     if should_normalize:
         gram /= ch * h * w
     return gram
+
+class GramMSELoss(torch.nn.Module):
+    def forward(self, input, target):
+        out = torch.nn.MSELoss()(gram_matrix(input), target)
+        return(out)
 
 def ensure_exists(path):
     if not os.path.exists(path):

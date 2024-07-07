@@ -218,20 +218,9 @@ class Vgg19(torch.nn.Module):
         return out
 
 class Vgg19Experimental(torch.nn.Module):
-    def __init__(self, requires_grad=False, show_progress=False, use_relu=True):
+    def __init__(self, requires_grad=False, show_progress=False):
         super().__init__()
         vgg_pretrained_features = models.vgg19(pretrained=True, progress=show_progress).features
-        self.use_relu = use_relu
-        if use_relu:  # use relu or as in original paper conv layers
-            self.layer_names = ['relu1_1', 'relu2_1', 'relu3_1', 'relu4_1', 'relu4_2', 'relu5_1']
-            self.offset = 1
-        else:
-            self.layer_names = ['conv1_1', 'conv2_1', 'conv3_1', 'conv4_1', 'conv4_2', 'conv5_1']
-            self.offset = 0
-        self.content_feature_maps_index = 4 # conv4_2
-        # all layers used for style representation except conv4_2
-        self.style_feature_maps_indices = list(range(len(self.layer_names)))
-        self.style_feature_maps_indices.remove(4)  # conv4_2
 
         self.conv1_1 = vgg_pretrained_features[0]
         self.relu1_1 = vgg_pretrained_features[1]
@@ -249,97 +238,70 @@ class Vgg19Experimental(torch.nn.Module):
         self.relu3_2 = vgg_pretrained_features[13]
         self.conv3_3 = vgg_pretrained_features[14]
         self.relu3_3 = vgg_pretrained_features[15]
-        self.max_pooling3 = vgg_pretrained_features[16]
-        self.conv4_1 = vgg_pretrained_features[17]
-        self.relu4_1 = vgg_pretrained_features[18]
-        self.conv4_2 = vgg_pretrained_features[19]
-        self.relu4_2 = vgg_pretrained_features[20]
-        self.conv4_3 = vgg_pretrained_features[21]
-        self.relu4_3 = vgg_pretrained_features[22]
-        self.conv4_4 = vgg_pretrained_features[23]
-        self.relu4_4 = vgg_pretrained_features[24]
-        self.max_pooling4 = vgg_pretrained_features[25]
-        self.conv5_1 = vgg_pretrained_features[26]
-        self.relu5_1 = vgg_pretrained_features[27]
-        self.conv5_2 = vgg_pretrained_features[28]
-        self.relu5_2 = vgg_pretrained_features[29]
-        self.conv5_3 = vgg_pretrained_features[30]
-        self.relu5_3 = vgg_pretrained_features[31]
-        self.conv5_4 = vgg_pretrained_features[32]
-        self.relu5_4 = vgg_pretrained_features[33]
-        self.max_pooling5 = vgg_pretrained_features[34]
+        self.conv3_4 = vgg_pretrained_features[16]
+        self.relu3_4 = vgg_pretrained_features[17]
+        self.max_pooling3 = vgg_pretrained_features[18]
+        self.conv4_1 = vgg_pretrained_features[19]
+        self.relu4_1 = vgg_pretrained_features[20]
+        self.conv4_2 = vgg_pretrained_features[21]
+        self.relu4_2 = vgg_pretrained_features[22]
+        self.conv4_3 = vgg_pretrained_features[23]
+        self.relu4_3 = vgg_pretrained_features[24]
+        self.conv4_4 = vgg_pretrained_features[25]
+        self.relu4_4 = vgg_pretrained_features[26]
+        self.max_pooling4 = vgg_pretrained_features[27]
+        self.conv5_1 = vgg_pretrained_features[28]
+        self.relu5_1 = vgg_pretrained_features[29]
+        self.conv5_2 = vgg_pretrained_features[30]
+        self.relu5_2 = vgg_pretrained_features[31]
+        self.conv5_3 = vgg_pretrained_features[32]
+        self.relu5_3 = vgg_pretrained_features[33]
+        self.conv5_4 = vgg_pretrained_features[34]
+        self.relu5_4 = vgg_pretrained_features[35]
+        self.max_pooling5 = vgg_pretrained_features[36]
 
         if not requires_grad:
             for param in self.parameters():
                 param.requires_grad = False
 
-    def forward(self, x):
-        x = self.conv1_1(x)
-        conv1_1 = x
-        x = self.relu1_1(x)
-        relu1_1 = x
-        x = self.conv1_2(x)
-        conv1_2 = x
-        x = self.relu1_2(x)
-        relu1_2 = x
-        x = self.max_pooling1(x)
-        x = self.conv2_1(x)
-        conv2_1 = x
-        x = self.relu2_1(x)
-        relu2_1 = x
-        x = self.conv2_2(x)
-        conv2_2 = x
-        x = self.relu2_2(x)
-        relu2_2 = x
-        x = self.max_pooling2(x)
-        x = self.conv3_1(x)
-        conv3_1 = x
-        x = self.relu3_1(x)
-        relu3_1 = x
-        x = self.conv3_2(x)
-        conv3_2 = x
-        x = self.relu3_2(x)
-        relu3_2 = x
-        x = self.conv3_3(x)
-        conv3_3 = x
-        x = self.relu3_3(x)
-        relu3_3 = x
-        x = self.max_pooling3(x)
-        x = self.conv4_1(x)
-        conv4_1 = x
-        x = self.relu4_1(x)
-        relu4_1 = x
-        x = self.conv4_2(x)
-        conv4_2 = x
-        x = self.relu4_2(x)
-        relu4_2 = x
-        x = self.conv4_3(x)
-        conv4_3 = x
-        x = self.relu4_3(x)
-        relu4_3 = x
-        x = self.conv4_4(x)
-        conv4_4 = x
-        x = self.max_pooling4(x)
-        x = self.conv5_1(x)
-        conv5_1 = x
-        x = self.relu5_1(x)
-        relu5_1 = x
-        x = self.conv5_2(x)
-        conv5_2 = x
-        x = self.relu5_2(x)
-        relu5_2 = x
-        x = self.conv5_3(x)
-        conv5_3 = x
-        x = self.relu5_3(x)
-        relu5_3 = x
-        x = self.conv5_4(x)
-        conv5_4 = x
-        x = self.max_pooling5(x)
-        # expose only the layers that you want to experiment with here
-        vgg_outputs = namedtuple("VggOutputs", self.layer_names)
-        if self.use_relu:
-            out = vgg_outputs(relu1_1, relu2_1, relu3_1, relu4_1, relu4_2, relu5_1)
-        else:
-            out = vgg_outputs(conv1_1, conv2_1, conv3_1, conv4_1, conv4_2, conv5_1)
+    def forward(self, x, out_keys):
+        out = {}
+        out['conv1_1'] = self.conv1_1(x)
+        out['relu1_1'] = self.relu1_1(out['conv1_1'])
+        out['conv1_2'] = self.conv1_2(out['relu1_1'])
+        out['relu1_2'] = self.relu1_2(out['conv1_2'])
+        out['max_pooling1'] = self.max_pooling1(out['relu1_2'])
+        out['conv2_1'] = self.conv2_1(out['max_pooling1'])
+        out['relu2_1'] = self.relu2_1(out['conv2_1'])
+        out['conv2_2'] = self.conv2_2(out['relu2_1'])
+        out['relu2_2'] = self.relu2_2(out['conv2_2'])
+        out['max_pooling2'] = self.max_pooling2(out['relu2_2'])
+        out['conv3_1'] = self.conv3_1(out['max_pooling2'])
+        out['relu3_1'] = self.relu3_1(out['conv3_1'])
+        out['conv3_2'] = self.conv3_2(out['relu3_1'])
+        out['relu3_2'] = self.relu3_2(out['conv3_2'])
+        out['conv3_3'] = self.conv3_3(out['relu3_2'])
+        out['relu3_3'] = self.relu3_3(out['conv3_3'])
+        out['conv3_4'] = self.conv3_4(out['relu3_3'])
+        out['relu3_4'] = self.relu3_4(out['conv3_4'])
+        out['max_pooling3'] = self.max_pooling3(out['relu3_4'])
+        out['conv4_1'] = self.conv4_1(out['max_pooling3'])
+        out['relu4_1'] = self.relu4_1(out['conv4_1'])
+        out['conv4_2'] = self.conv4_2(out['relu4_1'])
+        out['relu4_2'] = self.relu4_2(out['conv4_2'])
+        out['conv4_3'] = self.conv4_3(out['relu4_2'])
+        out['relu4_3'] = self.relu4_3(out['conv4_3'])
+        out['conv4_4'] = self.conv4_4(out['relu4_3'])
+        out['relu4_4'] = self.relu4_4(out['conv4_4'])
+        out['max_pooling4'] = self.max_pooling4(out['relu4_4'])
+        out['conv5_1'] = self.conv5_1(out['max_pooling4'])
+        out['relu5_1'] = self.relu5_1(out['conv5_1'])
+        out['conv5_2'] = self.conv5_2(out['relu5_1'])
+        out['relu5_2'] = self.relu5_2(out['conv5_2'])
+        out['conv5_3'] = self.conv5_3(out['relu5_2'])
+        out['relu5_3'] = self.relu5_3(out['conv5_3'])
+        out['conv5_4'] = self.conv5_4(out['relu5_3'])
+        out['relu5_4'] = self.relu5_4(out['conv5_4'])
+        out['max_pooling5'] = self.max_pooling5(out['relu5_4'])
 
-        return out
+        return [out[key] for key in out_keys]
