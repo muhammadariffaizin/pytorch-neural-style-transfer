@@ -7,6 +7,8 @@ from torch.autograd import Variable
 import numpy as np
 import os
 import argparse
+import pandas as pd
+import yaml
 
 
 def build_loss(neural_net, optimizing_img, target_representations, content_feature_maps_index, style_feature_maps_indices, config):
@@ -54,6 +56,10 @@ def neural_style_transfer(config):
     dump_path = os.path.join(config['output_img_dir'], out_dir_name)
     os.makedirs(dump_path, exist_ok=True)
 
+    # save config
+    with open(os.path.join(dump_path, 'config.yaml'), 'w') as f:
+        yaml.dump(config, f)
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     content_img = utils.prepare_img(content_img_path, config['height'], device)
@@ -94,6 +100,10 @@ def neural_style_transfer(config):
     #
     # Start of optimization procedure
     #
+    total_loss_list = []
+    content_loss_list = []
+    style_loss_list = []
+    tv_loss_list = []
     if config['optimizer'] == 'adam':
         optimizer = Adam((optimizing_img,), lr=1e1)
         tuning_step = make_tuning_step(neural_net, optimizer, target_representations, content_feature_maps_index_name[0], style_feature_maps_indices_names[0], config)
@@ -102,6 +112,14 @@ def neural_style_transfer(config):
             with torch.no_grad():
                 print(f'Adam | iteration: {cnt:03}, total loss={total_loss.item():12.4f}, content_loss={config["content_weight"] * content_loss.item():12.4f}, style loss={config["style_weight"] * style_loss.item():12.4f}, tv loss={config["tv_weight"] * tv_loss.item():12.4f}')
                 utils.save_and_maybe_display(optimizing_img, dump_path, config, cnt, num_of_iterations[config['optimizer']], should_display=False)
+
+            total_loss_list.append(total_loss.item())
+            content_loss_list.append(config["content_weight"] * content_loss.item())
+            style_loss_list.append(config["style_weight"] * style_loss.item())
+            tv_loss_list.append(config["tv_weight"] * tv_loss.item())
+
+        df_loss = pd.DataFrame({'total_loss': total_loss_list, 'content_loss': content_loss_list, 'style_loss': style_loss_list, 'tv_loss': tv_loss_list})
+        df_loss.to_csv(os.path.join(dump_path, 'loss.csv'))
     elif config['optimizer'] == 'lbfgs':
         # line_search_fn does not seem to have significant impact on result
         optimizer = LBFGS((optimizing_img,), max_iter=num_of_iterations['lbfgs'], line_search_fn='strong_wolfe')
@@ -117,6 +135,14 @@ def neural_style_transfer(config):
             with torch.no_grad():
                 print(f'L-BFGS | iteration: {cnt:03}, total loss={total_loss.item():12.4f}, content_loss={config["content_weight"] * content_loss.item():12.4f}, style loss={config["style_weight"] * style_loss.item():12.4f}, tv loss={config["tv_weight"] * tv_loss.item():12.4f}')
                 utils.save_and_maybe_display(optimizing_img, dump_path, config, cnt, num_of_iterations[config['optimizer']], should_display=False)
+
+            total_loss_list.append(total_loss.item())
+            content_loss_list.append(config["content_weight"] * content_loss.item())
+            style_loss_list.append(config["style_weight"] * style_loss.item())
+            tv_loss_list.append(config["tv_weight"] * tv_loss.item())
+
+            df_loss = pd.DataFrame({'total_loss': total_loss_list, 'content_loss': content_loss_list, 'style_loss': style_loss_list, 'tv_loss': tv_loss_list})
+            df_loss.to_csv(os.path.join(dump_path, 'loss.csv'))
 
             cnt += 1
             return total_loss
@@ -145,9 +171,9 @@ if __name__ == "__main__":
     parser.add_argument("--style_img_name", type=str, help="style image name", default='vg_starry_night.jpg')
     parser.add_argument("--height", type=int, help="height of content and style images", default=400)
 
-    parser.add_argument("--content_weight", type=float, help="weight factor for content loss", default=1e5)
-    parser.add_argument("--style_weight", type=float, help="weight factor for style loss", default=3e4)
-    parser.add_argument("--tv_weight", type=float, help="weight factor for total variation loss", default=1e0)
+    parser.add_argument("--content_weight", type=float, help="weight factor for content loss", default=5e3)
+    parser.add_argument("--style_weight", type=float, help="weight factor for style loss", default=3e1)
+    parser.add_argument("--tv_weight", type=float, help="weight factor for total variation loss", default=8e0)
 
     parser.add_argument("--optimizer", type=str, choices=['lbfgs', 'adam'], default='lbfgs')
     parser.add_argument("--model", type=str, choices=['vgg16', 'vgg19'], default='vgg19')
